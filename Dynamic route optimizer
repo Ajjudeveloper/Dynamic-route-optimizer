@@ -1,0 +1,127 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+from geopy.distance import geodesic
+from geopy.geocoders import Nominatim
+import requests
+
+# Initialize Geopy Nominatim
+geolocator = Nominatim(user_agent="route_optimizer")
+
+# API Keys
+TOMTOM_KEY = "6Wv8CPsRASpUe3ABwOyfonLiaN30kgE9"
+AQICN_KEY = "f5b372c33c9e1f543e26d718e757c1e38a19ad69"
+
+# Function to get coordinates of a location
+def get_coordinates(location_name):
+    location = geolocator.geocode(location_name)
+    if location:
+        return location.latitude, location.longitude
+    else:
+        return None
+
+# Function to calculate distance
+def calculate_distance(start, end):
+    return geodesic(start, end).kilometers
+
+# Function to get AQI and weather data from AQICN API
+def get_aqi_data(city_name):
+    url = f"http://api.waqi.info/feed/{city_name}/?token={AQICN_KEY}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("status") == "ok":
+                return data["data"]["aqi"], data["data"].get("forecast", {})
+        return None, None
+    except:
+        return None, None
+
+# Function to estimate emissions
+def estimate_emissions(distance_km, vehicle_type):
+    fuel_efficiency = 15  # km per liter for gasoline vehicle
+    if vehicle_type == "electric":
+        return 0
+    else:
+        return (distance_km / fuel_efficiency) * 2.3
+
+# Function to handle button click
+def calculate_route():
+    start_location = start_entry.get()
+    end_location = end_entry.get()
+    vehicle_type = vehicle_type_combobox.get()
+
+    # Validate inputs
+    if not start_location or not end_location or not vehicle_type:
+        messagebox.showerror("Error", "Please fill in all fields.")
+        return
+
+    # Get coordinates
+    start_coords = get_coordinates(start_location)
+    end_coords = get_coordinates(end_location)
+
+    if not start_coords or not end_coords:
+        messagebox.showerror("Error", "Unable to fetch coordinates. Check the location names.")
+        return
+
+    # Calculate distance
+    distance = calculate_distance(start_coords, end_coords)
+
+    # Fetch AQI data
+    aqi, _ = get_aqi_data(end_location)
+    if not aqi:
+        aqi = "Unavailable"
+
+    # Estimate emissions
+    emissions = estimate_emissions(distance, vehicle_type)
+
+    # Display results
+    result_text.set(
+        f"Route Summary:\n\n"
+        f"Start Location: {start_location} ({start_coords})\n"
+        f"End Location: {end_location} ({end_coords})\n"
+        f"Total Distance: {distance:.2f} km\n"
+        f"Air Quality Index (AQI) at Destination: {aqi}\n"
+        f"Estimated CO2 Emissions: {emissions:.2f} kg\n\n"
+        f"Optimization Suggestion:\n"
+        f"{'Optimal route with minimal emissions.' if emissions < 20 else 'Consider alternate routes to reduce emissions.'}"
+    )
+
+# Create the GUI application
+app = tk.Tk()
+app.title("Dynamic Route Optimizer")
+app.geometry("500x600")
+app.resizable(False, False)
+
+# Title label
+title_label = tk.Label(app, text="Dynamic Route Optimizer", font=("Arial", 16, "bold"))
+title_label.pack(pady=10)
+
+# Start location input
+start_label = tk.Label(app, text="Start Location:")
+start_label.pack(pady=5)
+start_entry = tk.Entry(app, width=50)
+start_entry.pack(pady=5)
+
+# End location input
+end_label = tk.Label(app, text="End Location:")
+end_label.pack(pady=5)
+end_entry = tk.Entry(app, width=50)
+end_entry.pack(pady=5)
+
+# Vehicle type dropdown
+vehicle_type_label = tk.Label(app, text="Vehicle Type:")
+vehicle_type_label.pack(pady=5)
+vehicle_type_combobox = ttk.Combobox(app, values=["Electric", "Gasoline"], state="readonly")
+vehicle_type_combobox.pack(pady=5)
+
+# Calculate button
+calculate_button = tk.Button(app, text="Calculate Route", command=calculate_route, bg="blue", fg="white")
+calculate_button.pack(pady=10)
+
+# Result display
+result_text = tk.StringVar()
+result_label = tk.Label(app, textvariable=result_text, justify="left", wraplength=450, font=("Arial", 10))
+result_label.pack(pady=20)
+
+# Run the application
+app.mainloop()
