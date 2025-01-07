@@ -3,7 +3,7 @@ from tkinter import ttk, messagebox
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 import requests
-import webbrowser  # To open URLs in the default web browser
+import webbrowser
 
 # Initialize Geopy Nominatim
 geolocator = Nominatim(user_agent="route_optimizer")
@@ -37,6 +37,25 @@ def get_aqi_data(city_name):
             data = response.json()
             if data.get("status") == "ok":
                 return data["data"]["aqi"], data["data"].get("forecast", {})
+        return None, None
+    except:
+        return None, None
+
+# Function to fetch real-time traffic data from TomTom API
+def get_traffic_data(start, end):
+    start_lat, start_lon = start
+    end_lat, end_lon = end
+    url = f"https://api.tomtom.com/routing/1/calculateRoute/{start_lat},{start_lon}:{end_lat},{end_lon}/json?traffic=true&key={TOMTOM_KEY}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            routes = data.get("routes", [])
+            if routes:
+                summary = routes[0]["summary"]
+                traffic_delay = summary.get("trafficDelayInSeconds", 0)
+                travel_time = summary.get("travelTimeInSeconds", 0)
+                return travel_time / 60, traffic_delay / 60  # Return time in minutes
         return None, None
     except:
         return None, None
@@ -78,6 +97,12 @@ def calculate_route():
     if not aqi:
         aqi = "Unavailable"
 
+    # Fetch traffic data
+    travel_time, traffic_delay = get_traffic_data(start_coords, end_coords)
+    if travel_time is None:
+        travel_time = "Unavailable"
+        traffic_delay = "Unavailable"
+
     # Estimate emissions
     emissions = estimate_emissions(distance, vehicle_type)
 
@@ -87,6 +112,8 @@ def calculate_route():
         f"Start Location: {start_location} ({start_coords})\n"
         f"End Location: {end_location} ({end_coords})\n"
         f"Total Distance: {distance:.2f} km\n"
+        f"Travel Time (incl. traffic): {travel_time} mins\n"
+        f"Traffic Delay: {traffic_delay} mins\n"
         f"Air Quality Index (AQI) at Destination: {aqi}\n"
         f"Estimated CO2 Emissions: {emissions:.2f} kg\n\n"
         f"Optimization Suggestion:\n"
@@ -104,7 +131,7 @@ def show_on_maps():
 # Create the GUI application
 app = tk.Tk()
 app.title("Dynamic Route Optimizer")
-app.geometry("500x650")
+app.geometry("500x700")
 app.resizable(False, False)
 
 # Title label
