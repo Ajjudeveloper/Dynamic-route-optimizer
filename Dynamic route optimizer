@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 import requests
+import webbrowser  # To open URLs in the default web browser
 
 # Initialize Geopy Nominatim
 geolocator = Nominatim(user_agent="route_optimizer")
@@ -10,6 +11,10 @@ geolocator = Nominatim(user_agent="route_optimizer")
 # API Keys
 TOMTOM_KEY = "6Wv8CPsRASpUe3ABwOyfonLiaN30kgE9"
 AQICN_KEY = "f5b372c33c9e1f543e26d718e757c1e38a19ad69"
+
+# Global variables for coordinates
+start_coords = None
+end_coords = None
 
 # Function to get coordinates of a location
 def get_coordinates(location_name):
@@ -46,6 +51,8 @@ def estimate_emissions(distance_km, vehicle_type):
 
 # Function to handle button click
 def calculate_route():
+    global start_coords, end_coords
+
     start_location = start_entry.get()
     end_location = end_entry.get()
     vehicle_type = vehicle_type_combobox.get()
@@ -86,10 +93,18 @@ def calculate_route():
         f"{'Optimal route with minimal emissions.' if emissions < 20 else 'Consider alternate routes to reduce emissions.'}"
     )
 
+# Function to open route in Google Maps
+def show_on_maps():
+    if start_coords and end_coords:
+        google_maps_url = f"https://www.google.com/maps/dir/{start_coords[0]},{start_coords[1]}/{end_coords[0]},{end_coords[1]}"
+        webbrowser.open(google_maps_url)
+    else:
+        messagebox.showerror("Error", "Please calculate the route first.")
+
 # Create the GUI application
 app = tk.Tk()
 app.title("Dynamic Route Optimizer")
-app.geometry("500x600")
+app.geometry("500x650")
 app.resizable(False, False)
 
 # Title label
@@ -117,6 +132,10 @@ vehicle_type_combobox.pack(pady=5)
 # Calculate button
 calculate_button = tk.Button(app, text="Calculate Route", command=calculate_route, bg="blue", fg="white")
 calculate_button.pack(pady=10)
+
+# Show on Maps button
+maps_button = tk.Button(app, text="Show on Maps", command=show_on_maps, bg="green", fg="white")
+maps_button.pack(pady=10)
 
 # Result display
 result_text = tk.StringVar()
