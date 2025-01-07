@@ -21,14 +21,13 @@ def get_coordinates(location_name):
     location = geolocator.geocode(location_name)
     if location:
         return location.latitude, location.longitude
-    else:
-        return None
+    return None
 
 # Function to calculate distance
 def calculate_distance(start, end):
     return geodesic(start, end).kilometers
 
-# Function to get AQI and weather data from AQICN API
+# Function to get AQI data
 def get_aqi_data(city_name):
     url = f"http://api.waqi.info/feed/{city_name}/?token={AQICN_KEY}"
     try:
@@ -36,12 +35,12 @@ def get_aqi_data(city_name):
         if response.status_code == 200:
             data = response.json()
             if data.get("status") == "ok":
-                return data["data"]["aqi"], data["data"].get("forecast", {})
-        return None, None
+                return data["data"]["aqi"]
+        return "Unavailable"
     except:
-        return None, None
+        return "Unavailable"
 
-# Function to fetch real-time traffic data from TomTom API
+# Function to fetch traffic data from TomTom API
 def get_traffic_data(start, end):
     start_lat, start_lon = start
     end_lat, end_lon = end
@@ -53,22 +52,19 @@ def get_traffic_data(start, end):
             routes = data.get("routes", [])
             if routes:
                 summary = routes[0]["summary"]
-                traffic_delay = summary.get("trafficDelayInSeconds", 0)
-                travel_time = summary.get("travelTimeInSeconds", 0)
-                return travel_time / 60, traffic_delay / 60  # Return time in minutes
+                return summary.get("travelTimeInSeconds", 0) // 60, summary.get("trafficDelayInSeconds", 0) // 60
         return None, None
     except:
         return None, None
 
 # Function to estimate emissions
 def estimate_emissions(distance_km, vehicle_type):
-    fuel_efficiency = 15  # km per liter for gasoline vehicle
-    if vehicle_type == "electric":
+    fuel_efficiency = 15  # km per liter for gasoline vehicles
+    if vehicle_type == "Electric":
         return 0
-    else:
-        return (distance_km / fuel_efficiency) * 2.3
+    return (distance_km / fuel_efficiency) * 2.3
 
-# Function to handle button click
+# Function to handle route calculation
 def calculate_route():
     global start_coords, end_coords
 
@@ -76,12 +72,10 @@ def calculate_route():
     end_location = end_entry.get()
     vehicle_type = vehicle_type_combobox.get()
 
-    # Validate inputs
     if not start_location or not end_location or not vehicle_type:
         messagebox.showerror("Error", "Please fill in all fields.")
         return
 
-    # Get coordinates
     start_coords = get_coordinates(start_location)
     end_coords = get_coordinates(end_location)
 
@@ -89,35 +83,20 @@ def calculate_route():
         messagebox.showerror("Error", "Unable to fetch coordinates. Check the location names.")
         return
 
-    # Calculate distance
     distance = calculate_distance(start_coords, end_coords)
-
-    # Fetch AQI data
-    aqi, _ = get_aqi_data(end_location)
-    if not aqi:
-        aqi = "Unavailable"
-
-    # Fetch traffic data
+    aqi = get_aqi_data(end_location)
     travel_time, traffic_delay = get_traffic_data(start_coords, end_coords)
-    if travel_time is None:
-        travel_time = "Unavailable"
-        traffic_delay = "Unavailable"
 
-    # Estimate emissions
     emissions = estimate_emissions(distance, vehicle_type)
 
-    # Display results
     result_text.set(
-        f"Route Summary:\n\n"
-        f"Start Location: {start_location} ({start_coords})\n"
-        f"End Location: {end_location} ({end_coords})\n"
-        f"Total Distance: {distance:.2f} km\n"
-        f"Travel Time (incl. traffic): {travel_time} mins\n"
-        f"Traffic Delay: {traffic_delay} mins\n"
-        f"Air Quality Index (AQI) at Destination: {aqi}\n"
-        f"Estimated CO2 Emissions: {emissions:.2f} kg\n\n"
-        f"Optimization Suggestion:\n"
-        f"{'Optimal route with minimal emissions.' if emissions < 20 else 'Consider alternate routes to reduce emissions.'}"
+        f"• Start: {start_location}\n"
+        f"• End: {end_location}\n"
+        f"• Distance: {distance:.2f} km\n"
+        f"• Travel Time: {travel_time or 'N/A'} mins\n"
+        f"• Traffic Delay: {traffic_delay or 'N/A'} mins\n"
+        f"• AQI: {aqi}\n"
+        f"• CO2: {emissions:.2f} kg"
     )
 
 # Function to open route in Google Maps
@@ -130,44 +109,41 @@ def show_on_maps():
 
 # Create the GUI application
 app = tk.Tk()
-app.title("Dynamic Route Optimizer")
-app.geometry("500x700")
-app.resizable(False, False)
+app.title("Route Optimizer")
+app.geometry("360x640")  # Mobile-friendly dimensions
+app.configure(bg="#F5F5F5")
 
-# Title label
-title_label = tk.Label(app, text="Dynamic Route Optimizer", font=("Arial", 16, "bold"))
-title_label.pack(pady=10)
+# Header
+header = tk.Label(app, text=" Dynamic Route Optimizer", font=("Arial", 16, "bold"), bg="#007BFF", fg="white")
+header.pack(fill="x", pady=10)
 
-# Start location input
-start_label = tk.Label(app, text="Start Location:")
-start_label.pack(pady=5)
-start_entry = tk.Entry(app, width=50)
+# Input Fields
+tk.Label(app, text="Start Location:", font=("Arial", 10), bg="#F5F5F5").pack(anchor="w", padx=20, pady=5)
+start_entry = tk.Entry(app, font=("Arial", 10), width=30)
 start_entry.pack(pady=5)
 
-# End location input
-end_label = tk.Label(app, text="End Location:")
-end_label.pack(pady=5)
-end_entry = tk.Entry(app, width=50)
+tk.Label(app, text="End Location:", font=("Arial", 10), bg="#F5F5F5").pack(anchor="w", padx=20, pady=5)
+end_entry = tk.Entry(app, font=("Arial", 10), width=30)
 end_entry.pack(pady=5)
 
-# Vehicle type dropdown
-vehicle_type_label = tk.Label(app, text="Vehicle Type:")
-vehicle_type_label.pack(pady=5)
-vehicle_type_combobox = ttk.Combobox(app, values=["Electric", "Gasoline"], state="readonly")
+tk.Label(app, text="Vehicle Type:", font=("Arial", 10), bg="#F5F5F5").pack(anchor="w", padx=20, pady=5)
+vehicle_type_combobox = ttk.Combobox(app, values=["Electric", "Gasoline"], state="readonly", font=("Arial", 10))
 vehicle_type_combobox.pack(pady=5)
 
-# Calculate button
-calculate_button = tk.Button(app, text="Calculate Route", command=calculate_route, bg="blue", fg="white")
-calculate_button.pack(pady=10)
+# Buttons
+button_frame = tk.Frame(app, bg="#F5F5F5")
+button_frame.pack(pady=10)
+tk.Button(button_frame, text="Calculate Route", command=calculate_route, font=("Arial", 10), bg="#28A745", fg="white").pack(side="left", padx=10)
+tk.Button(button_frame, text="Show Maps", command=show_on_maps, font=("Arial", 10), bg="#007BFF", fg="white").pack(side="left", padx=10)
 
-# Show on Maps button
-maps_button = tk.Button(app, text="Show on Maps", command=show_on_maps, bg="green", fg="white")
-maps_button.pack(pady=10)
-
-# Result display
+# Result Display
 result_text = tk.StringVar()
-result_label = tk.Label(app, textvariable=result_text, justify="left", wraplength=450, font=("Arial", 10))
-result_label.pack(pady=20)
+result_label = tk.Label(app, textvariable=result_text, font=("Arial", 10), bg="white", bd=1, relief="solid", wraplength=320, anchor="nw", justify="left", padx=10, pady=10)
+result_label.pack(pady=10, padx=10, fill="both", expand=True)
+
+# Footer
+footer = tk.Label(app, text="© 2025 Route Optimizer", font=("Arial", 8), bg="#F5F5F5", fg="gray")
+footer.pack(side="bottom", pady=10)
 
 # Run the application
 app.mainloop()
